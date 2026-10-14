@@ -22,10 +22,6 @@ if (!$match) {
 }
 
 $user = current_user();
-if (($user['role']??'')==='admin') {
-    $_GET['event_id']=$match['event_id'];$_GET['modality']=$match['modality'];$_GET['gender']=$match['gender'];$_GET['edit_match_id']=$matchId;
-    require __DIR__.'/admin_workspace.php';return;
-}
 $canManageScoreboard = $user && can_operate_match((int) $match['event_id'], $match['modality']);
 if (!$canManageScoreboard) {
     http_response_code(403);

@@ -44,7 +44,8 @@ function game_score_battles(array $battles, int $bestOf): array
 
 function game_apply_score_action(int $matchId, array $data, array $user): array
 {
-    if (($user['role'] ?? '') === 'admin') {
+    $administrative=($user['role']??'')==='admin'&&class_exists('AdminCompetitionService',false)&&AdminCompetitionService::$planning;
+    if (($user['role'] ?? '') === 'admin'&&!$administrative) {
         throw new GameScoreException('Correções e cancelamentos administrativos exigem prévia de impacto.',428);
     }
     $requestId = (string) ($data['request_id'] ?? '');
@@ -53,7 +54,8 @@ function game_apply_score_action(int $matchId, array $data, array $user): array
     if ($expectedVersion === false || $expectedVersion < 0) throw new GameScoreException('Versão do placar inválida.');
     $action = (string) ($data['action'] ?? '');
     $pdo = db();
-    $pdo->beginTransaction();
+    $ownsTransaction=!$pdo->inTransaction();
+    if($ownsTransaction)$pdo->beginTransaction();
     try {
         // Serialize score writes across this event before touching matches or class standings.
         $eventLock = $pdo->prepare('SELECT id FROM events WHERE id = (SELECT event_id FROM matches WHERE id = ?) FOR UPDATE');
@@ -65,11 +67,11 @@ function game_apply_score_action(int $matchId, array $data, array $user): array
         if (!$match) throw new GameScoreException('Partida não encontrada.', 404);
         if (!game_is_new_modality((string) $match['modality'])) throw new GameScoreException('Modalidade inválida.');
         if (!can_operate_match((int) $match['event_id'], (string) $match['modality'])) throw new GameScoreException('Sem permissão para esta partida.', 403);
-        if ($match['event_status'] === 'rascunho' || $match['event_status'] === 'encerrado') throw new GameScoreException('O evento não permite alterações.', 403);
+        if (!$administrative&&($match['event_status'] === 'rascunho' || $match['event_status'] === 'encerrado')) throw new GameScoreException('O evento não permite alterações.', 403);
         $duplicate = $pdo->prepare('SELECT id FROM score_logs WHERE match_id = ? AND request_id = ?');
         $duplicate->execute([$matchId, $requestId]);
         if ($duplicate->fetchColumn()) {
-            $pdo->commit();
+            if($ownsTransaction)$pdo->commit();
             return ['duplicate' => true];
         }
         if ((int) $match['version'] !== $expectedVersion) throw new GameScoreException('Esta partida foi alterada por outra pessoa. Recarregue o placar.', 409);
@@ -83,7 +85,7 @@ function game_apply_score_action(int $matchId, array $data, array $user): array
         $cancelReason = $match['cancel_reason'];
         $cancelledBy = $match['cancelled_by'];
         $isAdmin = ($user['role'] ?? '') === 'admin';
-        if (in_array($status, ['encerrada', 'wo', 'cancelada'], true) && $action !== 'correct') throw new GameScoreException('Partida fechada. Use a correção administrativa.');
+        if (in_array($status, ['encerrada', 'wo', 'cancelada'], true) && !in_array($action,['correct','cancel'],true)) throw new GameScoreException('Partida fechada. Use a correção administrativa.');
         if ($action === 'start') {
             if ($status !== 'agendada' || !$match['home_player_id'] || !$match['away_player_id']) throw new GameScoreException('Defina os dois participantes antes de iniciar.');
             $status = 'em_andamento';
@@ -160,13 +162,13 @@ function game_apply_score_action(int $matchId, array $data, array $user): array
             $children = $pdo->prepare('SELECT id FROM matches WHERE home_source_match_id = ? OR away_source_match_id = ? FOR UPDATE');
             $children->execute([$matchId, $matchId]);
             $affected = $children->fetchAll(PDO::FETCH_COLUMN);
-            if ($affected) throw new GameScoreException('Cancelamento bloqueado: a partida alimenta o confronto #' . implode(', #', $affected) . '.', 409);
+            if ($affected&&!$administrative) throw new GameScoreException('Cancelamento bloqueado: a partida alimenta o confronto #' . implode(', #', $affected) . '.', 409);
             $status = 'cancelada'; $cancelReason = $reason; $cancelledBy = (int) $user['id']; $winner = null;
         } elseif ($action === 'correct') {
             if (!$isAdmin || !in_array($status, ['encerrada','wo'], true)) throw new GameScoreException('Correção administrativa indisponível.', 403);
             $reason = trim((string) ($data['reason'] ?? ''));
             if (strlen($reason) < 3 || strlen($reason) > 240) throw new GameScoreException('Informe o motivo da correção.');
-            if ($match['stage'] === 'grupo') {
+            if ($match['stage'] === 'grupo'&&!$administrative) {
                 $bracket = $pdo->prepare("SELECT id FROM matches WHERE event_id = ? AND modality = ? AND stage <> 'grupo' ORDER BY id LIMIT 5");
                 $bracket->execute([$match['event_id'], $match['modality']]);
                 $affected = $bracket->fetchAll(PDO::FETCH_COLUMN);
@@ -174,7 +176,7 @@ function game_apply_score_action(int $matchId, array $data, array $user): array
             }
             $downstream = $pdo->prepare('SELECT id, status FROM matches WHERE home_source_match_id = ? OR away_source_match_id = ? FOR UPDATE');
             $downstream->execute([$matchId, $matchId]);
-            foreach ($downstream->fetchAll() as $next) if ($next['status'] !== 'agendada') throw new GameScoreException('Partida posterior já iniciada. Revise o impacto antes de corrigir.', 409);
+            foreach ($downstream->fetchAll() as $next) if (!$administrative&&$next['status'] !== 'agendada') throw new GameScoreException('Partida posterior já iniciada. Revise o impacto antes de corrigir.', 409);
             if ($match['modality'] === 'fifa') {
                 $homeScore = game_int_score($data['home_score'] ?? null, 'Placar');
                 $awayScore = game_int_score($data['away_score'] ?? null, 'Placar');
@@ -207,17 +209,15 @@ function game_apply_score_action(int $matchId, array $data, array $user): array
         $update->execute([$homeScore, $awayScore, json_encode($score, JSON_UNESCAPED_UNICODE), $status, $winner, $winnerTeam, $cancelReason, $cancelledBy, $matchId]);
         $log = $pdo->prepare('INSERT INTO score_logs (match_id, user_id, action, description, old_home_score, old_away_score, new_home_score, new_away_score, old_status, new_status, old_score_data, new_score_data, request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $log->execute([$matchId, $user['id'], $action, $action === 'correct' ? $reason : ($action === 'cancel' ? $cancelReason : 'Atualização de ' . modality_label($match['modality'])), $old['home_score'], $old['away_score'], $homeScore, $awayScore, $old['status'], $status, $old['score_data'], json_encode($score, JSON_UNESCAPED_UNICODE), $requestId]);
-        if (in_array($status, ['encerrada','wo'], true) && $match['stage'] !== 'grupo') {
+        if (!$administrative&&in_array($status, ['encerrada','wo'], true) && $match['stage'] !== 'grupo') {
             $match['winner_player_id'] = $winner;
             game_advance_winner($match);
         }
         if (in_array($action, ['finish','wo','correct','cancel'], true)) game_recalculate_class_points((int) $match['event_id'], (string) $match['modality']);
-        $pdo->commit();
-        game_forget_score_cache($matchId);
-        public_cache_forget_all();
+        if($ownsTransaction){$pdo->commit();game_forget_score_cache($matchId);public_cache_forget_all();}
         return ['duplicate' => false];
     } catch (Throwable $error) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($ownsTransaction&&$pdo->inTransaction()) $pdo->rollBack();
         throw $error;
     }
 }

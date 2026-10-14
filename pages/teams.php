@@ -1,6 +1,4 @@
 <?php
-if (has_role(['admin'])) { $adminInitialTab = 'teams'; require __DIR__ . '/admin_workspace.php'; return; }
-
 require_roles(['admin', 'professor']);
 ensure_interclasse_schema_updates();
 
@@ -39,6 +37,7 @@ if (!$registeredModalityStmt->fetchColumn()) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if(has_role(['admin'])) { http_response_code(428); echo '<div class="alert alert-warning">Confira os impactos antes de confirmar.</div>'; return; }
     verify_csrf();
     $action = $_POST['action'] ?? 'single';
     $gender = $isMixedModality ? 'masculino' : ($_POST['gender'] ?? 'masculino');
@@ -176,7 +175,7 @@ foreach ($teams as $team) {
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold"><?= game_is_new_modality($modality) ? 'Cadastrar turma' : 'Cadastrar time (individual)' ?></div>
             <div class="card-body">
-                <?php if ($event['status'] === 'encerrado'): ?>
+                <?php if ($event['status'] === 'encerrado' && !has_role(['admin'])): ?>
                     <div class="alert alert-warning mb-0">Evento encerrado. Não é possível cadastrar novos times.</div>
                 <?php else: ?>
                     <form method="post">
@@ -226,7 +225,7 @@ foreach ($teams as $team) {
         <div class="card shadow-sm">
             <div class="card-header bg-white fw-semibold"><?= game_is_new_modality($modality) ? 'Cadastrar turmas em massa' : 'Cadastrar times em massa' ?></div>
             <div class="card-body">
-                <?php if ($event['status'] === 'encerrado'): ?>
+                <?php if ($event['status'] === 'encerrado' && !has_role(['admin'])): ?>
                     <div class="alert alert-warning mb-0">Evento encerrado. Não é possível cadastrar novos times.</div>
                 <?php else: ?>
                     <form method="post">
@@ -302,6 +301,7 @@ foreach ($teams as $team) {
                                         <?= (int) ($team['player_count'] ?? 0) ?>/<?= (int) $playerLimit ?>
                                     </span>
                                     <a class="btn btn-sm btn-outline-primary" href="index.php?page=players&team_id=<?= (int) $team['id'] ?>">Gerenciar</a>
+                                    <?php if(has_role(['admin'])): ?><button type="button" class="btn btn-sm btn-outline-secondary" data-admin-edit="teams" data-id="<?= (int) $team['id'] ?>">Editar equipe</button><button type="button" class="btn btn-sm btn-outline-danger" data-admin-op="archive" data-admin-entity="teams" data-id="<?= (int) $team['id'] ?>">Arquivar inscrição</button><?php endif; ?>
                                 </div>
                             </td>
                         </tr>

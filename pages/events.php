@@ -386,7 +386,7 @@ $totals = db()->query(
                 <div class="event-card-footer">
                     <span class="small text-muted">Elencos até <?= e(format_datetime($event['roster_edit_until'])) ?></span>
                     <div class="event-admin-actions">
-                        <?php if ($manager && !$canCreateEvents && $event['status'] !== 'encerrado'): ?>
+                        <?php if ($manager && ($canCreateEvents || $event['status'] !== 'encerrado')): ?>
                             <form method="post" class="d-flex flex-wrap gap-2 align-items-center">
                                 <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                                 <input type="hidden" name="action" value="status">
@@ -404,7 +404,8 @@ $totals = db()->query(
                                 <button class="btn btn-sm btn-outline-warning archive-btn" data-event-id="<?= (int) $event['id'] ?>">Arquivar</button>
                             <?php endif; ?>
                             <?php if ($user && $user['role'] === 'admin'): ?>
-                                <a class="btn btn-sm btn-outline-primary" href="index.php?page=match_manager&amp;event_id=<?= (int) $event['id'] ?>&amp;tab=events">Gerenciar / arquivar</a>
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-admin-edit="events" data-id="<?= (int) $event['id'] ?>">Editar evento</button>
+                                <button type="button" class="btn btn-sm btn-outline-warning" data-admin-op="archive" data-admin-entity="events" data-id="<?= (int) $event['id'] ?>">Arquivar</button>
                             <?php endif; ?>
                         </div>
                     </div>

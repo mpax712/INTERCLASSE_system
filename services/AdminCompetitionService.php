@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/GameScoreService.php';
+require_once __DIR__ . '/TraditionalScoreService.php';
 
 final class AdminOperationException extends RuntimeException
 {
@@ -172,7 +173,7 @@ final class AdminCompetitionService
             if (!hash_equals($plan['fingerprint'],self::hash($before))) throw new AdminOperationException('O campeonato mudou desde a prévia. Confira os impactos novamente.',409);
             $this->applyDiff($plan['changes']);
             $this->validate();
-            foreach($plan['changes']['matches']??[] as $matchId=>$change){$old=$change['before'];$new=$change['after'];
+            foreach(($plan['operation']==='score_action'?[]:($plan['changes']['matches']??[])) as $matchId=>$change){$old=$change['before'];$new=$change['after'];
                 if(!$old||!$new||($old['home_score']===$new['home_score']&&$old['away_score']===$new['away_score']&&$old['status']===$new['status']&&$old['score_data']===$new['score_data']))continue;
                 $this->write('score_logs',['match_id'=>$matchId,'user_id'=>$this->actorId,'action'=>'admin_'.$plan['operation'],'description'=>mb_substr(trim($reason),0,255),'old_home_score'=>$old['home_score'],'old_away_score'=>$old['away_score'],'new_home_score'=>$new['home_score'],'new_away_score'=>$new['away_score'],'old_status'=>$old['status'],'new_status'=>$new['status'],'old_score_data'=>$old['score_data'],'new_score_data'=>$new['score_data'],'request_id'=>substr(hash('sha256',$id.':'.$matchId),0,64)]);
             }
@@ -219,6 +220,28 @@ final class AdminCompetitionService
     private function applyCommand(array $command): void
     {
         $operation = $command['operation'] ?? ''; $entity = $command['entity'] ?? ''; $id = (int)($command['id'] ?? 0);
+        if($operation==='score_action'){
+            $match=$this->row('matches',$id);if($match['archived_at']||$match['review_state']!=='ready')throw new AdminOperationException('Resolva os participantes da partida em revisão antes de lançar o placar.',409);
+            $data=$command['data']??[];$actor=['id'=>$this->actorId,'role'=>'admin'];
+            $response=game_is_new_modality($match['modality'])?game_apply_score_action($id,$data,$actor):traditional_apply_score_action($id,$data,$actor);
+            if($response['duplicate']??false)return;
+            $result=$this->row('matches',$id);
+            if(in_array($result['status'],['encerrada','wo'],true)){
+                $score=json_decode($result['score_data']??'{}',true)??[];
+                if($result['modality']==='volei'&&$result['status']==='encerrada'){
+                    $score['sets']=array_values(array_filter($score['sets']??[],fn($s)=>(int)($s['home']??0)!==(int)($s['away']??0)));
+                    $home=count(array_filter($score['sets'],fn($s)=>$s['home']>$s['away']));$away=count($score['sets'])-$home;
+                    if($home!==(int)($score['home_sets']??0)||$away!==(int)($score['away_sets']??0))$score['sets_count_only']=true;
+                }
+                if($result['modality']==='xadrez'&&in_array($data['team']??null,['home','away'],true)){$result['home_score']=$data['team']==='home'?1:0;$result['away_score']=$data['team']==='away'?1:0;}
+                $this->saveMatch(['status'=>$result['status'],'home_score'=>$result['home_score'],'away_score'=>$result['away_score'],'score_data'=>$score],$id);
+            }
+            return;
+        }
+        if($operation==='batch'){
+            $commands=$command['commands']??[];if(!is_array($commands)||!count($commands)||count($commands)>200)throw new AdminOperationException('Informe de 1 a 200 cadastros por importação.');
+            foreach($commands as $item){if(!is_array($item)||($item['operation']??'')==='batch')throw new AdminOperationException('Importação inválida.');$this->applyCommand($item);}return;
+        }
         if ($operation === 'save_match') { $this->saveMatch($command['data'] ?? [],$id); return; }
         if ($operation === 'regenerate') { $this->regenerate($command); return; }
         if ($operation === 'save_advancement') {
@@ -321,7 +344,7 @@ final class AdminCompetitionService
     {
         $allowed=['classes'=>['name'],'teams'=>['event_id','modality','name','class_name','gender','group_name','representative_id','representative_name'],
             'players'=>['team_id','name','email','birth_date','jersey_number','group_name'],
-            'events'=>['name','description','start_date','end_date','place','status','group_count','best_thirds_count','teams_advancing_per_group','advancement_mode']];
+            'events'=>['name','description','start_date','end_date','place','status','group_count','best_thirds_count','teams_advancing_per_group','advancement_mode','roster_edit_until']];
         if(!isset($allowed[$table])) throw new AdminOperationException('Use o editor de partidas.');
         $old=$id?$this->row($table,$id):[]; $row=['id'=>$id]+array_intersect_key($data,array_flip($allowed[$table]));
         $maxName=$table==='events'?160:120;
@@ -360,7 +383,18 @@ final class AdminCompetitionService
             $this->pdo->prepare('UPDATE class_standings SET class_name=? WHERE class_name=?')->execute([$row['name'],$old['name']]);
         }
         if($table==='events'&&isset($row['end_date'])&&$row['end_date']==='')$row['end_date']=null;
+        if($table==='events'&&isset($row['roster_edit_until'])){$row['roster_edit_until']=$row['roster_edit_until']===''?null:str_replace('T',' ',$row['roster_edit_until']);if($row['roster_edit_until']&&!strtotime($row['roster_edit_until']))throw new AdminOperationException('Prazo de elenco inválido.');}
         $newId=$this->write($table,$row);
+        if($table==='events'&&!$id){
+            foreach($data['modalities']??[] as $mod){
+                $definition=modality_definition($mod);if(!$definition)throw new AdminOperationException('Modalidade inválida.');
+                $settings=['event_id'=>$newId,'modality'=>$mod,'score_type'=>$definition['score_type'],'bracket_type'=>$definition['default_format'],'max_players_per_team'=>game_is_new_modality($mod)?2:$definition['player_limit']];
+                if($mod==='volei'){$settings['set_best_of']=$this->integer($data['set_best_of']??3,1,5);if(!in_array($settings['set_best_of'],[1,3,5],true))throw new AdminOperationException('Escolha melhor de 1, 3 ou 5 sets.');$settings['set_points']=$this->integer($data['set_points']??25,1,99);}
+                if($mod==='basquete')$settings['quarters_count']=$this->integer($data['quarters_count']??4,1,99);
+                if(game_is_new_modality($mod))$settings['rules_json']=self::json(validate_game_rules($mod,$data['rules'][$mod]??[]));
+                $this->write('event_modalities',$settings);
+            }
+        }
         if($table==='events')foreach($data['modalities']??[] as $modality){$definition=modality_definition($modality);if(!$definition)throw new AdminOperationException('Modalidade inválida.');$stmt=$this->pdo->prepare('SELECT id FROM event_modalities WHERE event_id=? AND modality=?');$stmt->execute([$newId,$modality]);if(!$stmt->fetch())$this->write('event_modalities',['event_id'=>$newId,'modality'=>$modality,'score_type'=>$definition['score_type'],'bracket_type'=>$definition['default_format'],'max_players_per_team'=>game_is_new_modality($modality)?2:$definition['player_limit'],'rules_json'=>isset($definition['rules'])?self::json($definition['rules']):null]);}
         if(in_array($table,['teams','players'],true)) $this->warnings[]='A inscrição pode ser mantida sem novos jogos. Use “Gerar faltantes”, reorganização de fase ou regeneração para incluí-la na tabela.';
     }
@@ -434,7 +468,7 @@ final class AdminCompetitionService
             } elseif($row['status']==='wo') {
                 $winnerSide=$data['winner_side']??($row['home_score']>$row['away_score']?'home':'away');
                 if(!in_array($winnerSide,['home','away'],true)) throw new AdminOperationException('Selecione o vencedor do W.O.');
-                $goals=$modality==='fifa'?game_match_rules($row)['wo_goals']:($modality==='clash_royale'?intdiv(game_match_rules($row)['best_of'],2)+1:3);
+                $goals=match($modality){'fifa'=>game_match_rules($row)['wo_goals'],'clash_royale'=>intdiv(game_match_rules($row)['best_of'],2)+1,'basquete'=>20,'volei'=>intdiv((int)($settings['set_best_of']?:3),2)+1,default=>3};
                 $row['home_score']=$winnerSide==='home'?$goals:0;$row['away_score']=$winnerSide==='away'?$goals:0;$score['wo']=true;
             } elseif($modality==='clash_royale') {
                 $wins=game_score_battles($score['battles']??[],game_match_rules($row)['best_of']);
@@ -448,6 +482,7 @@ final class AdminCompetitionService
             } else {
                 if($modality==='volei') {
                     $home=0;$away=0;foreach($score['sets']??[] as $set){$h=$this->integer($set['home']??0);$a=$this->integer($set['away']??0);if($h===$a)throw new AdminOperationException('Cada set finalizado precisa ter vencedor.');$h>$a?$home++:$away++;}
+                    if(!empty($score['sets_count_only'])){$home=$this->integer($score['home_sets']??0,0,5);$away=$this->integer($score['away_sets']??0,0,5);}
                     $matchRules=json_decode($row['rules_snapshot']??'{}',true)??[];$target=intdiv((int)($matchRules['set_best_of']??($settings['set_best_of']?:3)),2)+1;if(max($home,$away)!==$target||min($home,$away)>=$target)throw new AdminOperationException('Os sets não correspondem ao formato da partida.');$row['home_score']=$home;$row['away_score']=$away;$score['home_sets']=$home;$score['away_sets']=$away;
                 }
                 $winnerSide=$row['home_score']===$row['away_score']?null:($row['home_score']>$row['away_score']?'home':'away');

@@ -1,6 +1,4 @@
 <?php
-if (has_role(['admin'])) { $adminInitialTab = 'players'; require __DIR__ . '/admin_workspace.php'; return; }
-
 require_login();
 
 $teamId = (int) ($_GET['team_id'] ?? 0);
@@ -33,7 +31,7 @@ $playerLimit = player_limit_for_team($team);
 $teamIsFull = $playerCount >= $playerLimit;
 $teamOverLimit = $playerCount > $playerLimit;
 $canEditPlayers = $canManage && ($isEventManager || (!$eventInProgress && !$rosterClosed));
-$formDisabled = !$canEditPlayers || $teamIsFull;
+$formDisabled = !$canEditPlayers || ($teamIsFull && !has_role(['admin']));
 $isGameParticipant = game_is_new_modality((string) $team['modality']);
 $gameParticipantCount = 0;
 if ($isGameParticipant) {
@@ -43,6 +41,7 @@ if ($isGameParticipant) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if(has_role(['admin'])) { http_response_code(428); echo '<div class="alert alert-warning">Confira os impactos antes de confirmar.</div>'; return; }
     verify_csrf();
     $action = $_POST['action'] ?? 'create';
     if ($isGameParticipant && $action !== 'update') {
@@ -202,13 +201,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <a class="btn btn-outline-secondary" href="index.php?page=event&id=<?= (int) $team['event_id'] ?>&modality=<?= e($team['modality']) ?>">Voltar</a>
 </div>
 
-<?php if ($eventInProgress): ?>
+<?php if ($eventInProgress && !has_role(['admin'])): ?>
     <div class="alert alert-warning">
         Não é possível cadastrar jogadores enquanto o evento estiver em andamento.
     </div>
 <?php endif; ?>
 
-<?php if ($rosterClosed): ?>
+<?php if ($rosterClosed && !has_role(['admin'])): ?>
     <div class="alert alert-warning">
         As inscrições deste evento não estão abertas para edição de jogadores<?= $rosterDeadlinePassed ? ' desde ' . e(format_datetime($team['roster_edit_until'])) : '.' ?>
     </div>
@@ -303,12 +302,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </td>
                             <td data-label="Ações">
                                 <div class="d-flex gap-2 flex-wrap">
+                                    <?php if(has_role(['admin'])): ?><button type="button" class="btn btn-sm btn-outline-secondary" data-admin-edit="players" data-id="<?= (int) $player['id'] ?>">Detalhes / transferir</button><?php endif; ?>
                                     <button class="btn btn-sm btn-outline-primary" form="player-form-<?= (int) $player['id'] ?>">Salvar</button>
                                     <form method="post" onsubmit="return confirmAction('Excluir este jogador?')">
                                         <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="player_id" value="<?= (int) $player['id'] ?>">
-                                        <button class="btn btn-sm btn-outline-danger">Excluir</button>
+                                        <button class="btn btn-sm btn-outline-danger">Arquivar</button>
                                     </form>
                                 </div>
                             </td>

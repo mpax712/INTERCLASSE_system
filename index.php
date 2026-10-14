@@ -116,5 +116,11 @@ if ($page === 'export_csv' || $page === 'export_class_standings_csv') {
 
 ob_start();
 require __DIR__ . '/includes/header.php';
-require __DIR__ . '/' . $file;
+if (has_role(['admin']) && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+    && in_array($page, ['classes','create_event','event','events','match_manager','teams','players'], true)) {
+    require_once __DIR__ . '/includes/admin_ui.php';
+    admin_ui_post_fallback($page, $_POST);
+} else {
+    require __DIR__ . '/' . $file;
+}
 require __DIR__ . '/includes/footer.php';

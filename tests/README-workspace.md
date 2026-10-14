@@ -1,5 +1,13 @@
 # Testes de atualização sem recarregamento
 
+## Interface recuperada
+
+`admin_ui_integration.php` executa os cenários de `admin_integration.php` e verifica os formulários originais, inscrição sem redistribuição dos grupos, criação de evento com regras próprias e os controles administrativos de Handebol, FIFA, Clash Royale, Vôlei, Basquete e Xadrez. O teste exige banco ou esquema isolado com prefixo `interclasse_admin_test_`.
+
+`browser_restored_ui.cjs` recebe `ADMIN_FIXTURE`, `BASE_URL`, `PLAYWRIGHT_MODULE`, `BROWSER_EXECUTABLE` e `SCREENSHOT_DIR`. Confere páginas separadas, campos preservados ao cancelar, gravação sem navegação completa, opções avançadas recolhidas, histórico contextual, placar FIFA e formulários sem JavaScript. Produz capturas em desktop e celular.
+
+Validação da recuperação: 49 verificações na cópia MySQL e 48 na cópia PostgreSQL, além do fluxo no navegador e da análise de sintaxe de PHP e JavaScript. As gravações ocorreram exclusivamente nas cópias de teste. A implantação remota da Vercel não faz parte dessa validação local.
+
 `browser_workspace.cjs` verifica filtros e histórico sem navegação completa,
 geração de jogos, edição, criação/movimentação/exclusão de times e partidas,
 FIFA e Clash Royale, cancelamento de confirmações, clique duplo, falhas de rede,

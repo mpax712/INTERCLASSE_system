@@ -677,10 +677,7 @@ if ($isBracketModality || game_is_new_modality($selectedModality)) {
             <span class="small text-muted">Use quando as inscrições ou fases anteriores estiverem prontas.</span>
         </div>
         <div class="card-body">
-            <?php if (has_role(['admin'])): ?>
-                <a class="btn btn-primary" href="index.php?page=match_manager&event_id=<?= $eventId ?>&modality=<?= e($selectedModality) ?>&gender=<?= e($gender) ?>">Gerar, reorganizar ou corrigir confrontos</a>
-                <p class="text-muted mt-2 mb-0">A prévia informa quais partidas e resultados serão mantidos, atualizados ou arquivados.</p>
-            <?php elseif ($event['status'] === 'encerrado'): ?>
+            <?php if ($event['status'] === 'encerrado' && !has_role(['admin'])): ?>
                 <div class="alert alert-warning mb-0">Evento encerrado. Não é possível gerar novas partidas ou fases.</div>
             <?php else: ?>
                 <div class="row g-2 align-items-end event-actions-grid">

@@ -45,6 +45,7 @@
             && eventId === root.dataset.eventId
             && (url.pathname === location.pathname || url.pathname === new URL('index.php', location.href).pathname);
     }
+    window.EventWorkspaceNavigation = {refresh: () => update(new URL(location.href), {historyMode:'replace'})};
 
     function clearNotices() {
         root.querySelectorAll('[data-workspace-message], [data-workspace-error]').forEach(item => item.remove());

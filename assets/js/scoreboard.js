@@ -344,7 +344,7 @@
             setSyncState('error', 'Reenvie a atualização pendente antes de registrar outra ação.');
             return null;
         }
-        if (needsConfirmation) {
+        if (needsConfirmation&&!window.AdminScoreTransport) {
             const confirmed = await confirmAsync(message, {
                 title: payload.action === 'wo' || payload.action === 'finish' ? 'Confirmar resultado' : 'Confirmar ação',
                 variant: payload.action === 'wo' || payload.action === 'finish' ? 'btn-danger' : 'btn-primary'
@@ -369,6 +369,7 @@
                 return responsePayload;
             })
             .catch(error => {
+                if(error.cancelled){setSyncState('ok','Operação cancelada');scheduleRefresh();return null;}
                 if (error.status === 409 && error.payload && error.payload.current) render(error.payload.current);
                 if (!error.status || error.status >= 500) {
                     uncertainPayload = payload;
@@ -574,6 +575,7 @@
         });
     }
 
+    window.addEventListener('admin-score-refresh',event=>render(event.detail));
     renderControls(root.dataset.status || 'agendada');
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {

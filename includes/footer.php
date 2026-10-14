@@ -1,3 +1,8 @@
+        <?php if(has_role(['admin'])&&in_array($page??'', ['event','match_manager','players','teams','classes','create_event','events','scoreboard'],true)){
+            require_once __DIR__.'/admin_ui.php';
+            $tabs=['players'=>'players','teams'=>'teams','classes'=>'classes','create_event'=>'events','events'=>'events'];
+            admin_ui_tools(['page'=>$page,'tab'=>$tabs[$page]??'matches','matchId'=>$page==='scoreboard'?(int)($matchId??0):0,'eventId'=>(int)($team['event_id']??$eventId??$match['event_id']??0),'teamId'=>(int)($_GET['team_id']??0),'modality'=>$team['modality']??$selectedModality??$modality??$match['modality']??'','gender'=>$gender??$team['gender']??$match['gender']??'masculino']);
+        } ?>
         </main>
         <footer class="footer-custom py-3 mt-4">
             <div class="container">

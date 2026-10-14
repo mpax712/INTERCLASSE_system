@@ -179,6 +179,18 @@ A tabela ordena principalmente por saldo de pontuação, como pedido no projeto.
 - CSRF em formulários e endpoints de escrita da API.
 - Regras de permissão por perfil e por evento.
 
+## Interface administrativa
+
+Turmas, equipes, jogadores, montagem e placar continuam em telas separadas, com os formulários e a organização visual originais. As permissões ampliadas do administrador permanecem disponíveis, inclusive em eventos encerrados.
+
+- Use **Mais opções** em uma partida para editar participantes, fase, origens das vagas, agenda ou resultado. As regras específicas ficam recolhidas até serem abertas.
+- Use **Detalhes / transferir** na lista de jogadores ou **Editar equipe** na lista de equipes para alterações administrativas adicionais.
+- **Histórico de alterações** mostra as mudanças relacionadas à tela atual. **Arquivados e restauração** permite recuperar cadastros ou analisar a exclusão definitiva.
+- **Reorganizar confrontos** oferece geração de partidas faltantes, reorganização de fase e regeneração da modalidade com uma proposta antes da gravação.
+- Alterações com dependências mostram os impactos e exigem justificativa. Resultados incompatíveis exigem reinício explícito ou pausa para revisão manual.
+
+Os formulários atualizam o conteúdo sem navegação completa. Cancelar preserva os campos; erros de validação mantêm o formulário disponível. Sem JavaScript, os formulários administrativos passam por uma tela de confirmação no servidor. Os controles de placar ao vivo continuam dependendo de JavaScript.
+
 ## Observação sobre atualização de placar
 
 O placar público faz uma consulta simples a cada poucos segundos. Não usa WebSocket e não precisa de infraestrutura especial. Se quiser deixar ainda mais simples, basta remover o `setInterval` de `assets/js/live-score.js` e deixar a atualização por recarregamento manual da página.

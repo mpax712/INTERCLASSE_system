@@ -70,6 +70,7 @@
         showControls();
         setFeedback('Salvando...', 'muted');
         try {
+            if(window.AdminScoreTransport){const data=await window.AdminScoreTransport.send(pendingPayload);pendingPayload=null;render(data);setFeedback('Placar atualizado com sucesso.','success');return;}
             const response = await fetch('api/score.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -85,6 +86,8 @@
             render(data);
             setFeedback(data.last_action_message || 'Placar atualizado com sucesso.', 'success');
         } catch (error) {
+            if(error.cancelled){pendingPayload=null;setFeedback('Operação cancelada.','muted');return;}
+            if(error.saved||(error.status&&error.status<500))pendingPayload=null;
             setFeedback(pendingPayload
                 ? 'Não foi possível confirmar o salvamento. Toque em “Reenviar atualização” para repetir a mesma operação com segurança.'
                 : (error.message || 'Não foi possível atualizar o placar.'), 'danger');
@@ -113,7 +116,7 @@
             payload.reason = prompt('Motivo do cancelamento:') || '';
             if (!payload.reason) return;
         }
-        if (['finish', 'wo', 'cancel'].includes(action) && !confirm('Confirmar esta alteração? Ela pode mudar a classificação.')) return;
+        if (!window.AdminScoreTransport&&['finish', 'wo', 'cancel'].includes(action) && !confirm('Confirmar esta alteração? Ela pode mudar a classificação.')) return;
         pendingPayload = payload;
         submitPending();
     }
@@ -122,6 +125,7 @@
         if (button) send(button);
     });
     retryButton.addEventListener('click', submitPending);
+    window.addEventListener('admin-score-refresh',event=>render(event.detail));
     showControls();
     refresh();
     setInterval(() => { if (!document.hidden) refresh(); }, 20000);
