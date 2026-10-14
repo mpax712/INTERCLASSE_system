@@ -1,16 +1,19 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/*.php": {
+    "api/index.php": {
       "runtime": "vercel-php@0.9.0",
       "maxDuration": 60,
-      "includeFiles": "{index.php,includes/**,pages/**,services/**,assets/**}"
+      "includeFiles": "{index.php,api/**,includes/**,pages/**,services/**,assets/**}"
     }
   },
   "routes": [
     { "src": "/(?:includes|pages|services|scripts|tests|database|storage)(?:/.*)?", "status": 404 },
     { "src": "/api/_bootstrap.php", "status": 404 },
+    { "src": "/api/(admin_forms|admin_operations|auth|classes|class_standings|events|export|games|players|score|teams|users)\\.php", "dest": "/api/index.php?__api_route=$1" },
     { "src": "/(?:index.php)?", "dest": "/api/index.php" },
+    { "src": "/api/index\\.php", "dest": "/api/index.php" },
+    { "src": "/api(?:/.*)?", "status": 404 },
     { "src": "/(?!api/).*\\.php", "status": 404 },
     { "handle": "filesystem" },
     { "src": "/.*", "status": 404 }

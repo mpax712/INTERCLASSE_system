@@ -23,7 +23,7 @@ Os testes `tests/admin_integration.php` aceitam exclusivamente uma cópia com ba
 
 ## Hospedagem no Vercel
 
-O arquivo `vercel.json` usa `vercel-php@0.9.0`, encaminha `/` e `/index.php` para `api/index.php`, inclui os arquivos PHP necessários e mantém assets e APIs nas URLs atuais. Diretórios internos e arquivos privados não são publicados como páginas. Selecione a raiz deste repositório como Root Directory e o preset Other, sem comando de build personalizado.
+O arquivo `vercel.json` usa `vercel-php@0.9.0` com uma única função (`api/index.php`), que encaminha páginas e APIs aos arquivos existentes. Isso mantém as URLs e evita ultrapassar as 12 funções permitidas pelo plano Hobby. Assets continuam estáticos; diretórios internos e arquivos privados não são publicados como páginas. Selecione a raiz deste repositório como Root Directory e o preset Other, sem comando de build personalizado.
 
 Configure `DATABASE_URL` no painel Environment Variables do Vercel, com a senha real codificada na URL e `sslmode=require`. O `.env.example` aponta para o novo pooler de São Paulo na porta 5432 (modo sessão). Configure Production e Preview conforme os bancos correspondentes; não envie senhas ao Git. Use `APP_DEBUG=false` e `APP_SECURE_COOKIES=true`.
 
