@@ -1,9 +1,22 @@
 <?php
 
-require_once __DIR__ . '/../includes/match_helpers.php';
+// API responses must remain JSON even when PHP emits a warning or fails during startup.
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+ini_set('log_errors', '1');
+$GLOBALS['api_output_base'] = ob_get_level();
+$GLOBALS['api_response_sent'] = false;
+ob_start();
 
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET' && basename($_SERVER['SCRIPT_NAME'] ?? '') !== 'score.php') {
-    register_shutdown_function('public_cache_forget_all');
+function api_clear_output(): void
+{
+    while (ob_get_level() > $GLOBALS['api_output_base']) ob_end_clean();
+}
+
+function api_rollback_safely(): void
+{
+    try { if (function_exists('db') && db()->inTransaction()) db()->rollBack(); }
+    catch (Throwable $rollbackError) { error_log('[API rollback] '.$rollbackError->getMessage()); }
 }
 
 // Security headers
@@ -18,21 +31,18 @@ header('Expires: 0');
 
 function json_response(array $data, int $status = 200): void
 {
-    if ($status >= 400 && db()->inTransaction()) {
-        db()->rollBack();
-    }
+    if ($status >= 400) api_rollback_safely();
+    $json = json_encode($data + ($status >= 400 ? ['ok' => false] : []), JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
+    api_clear_output();
+    $GLOBALS['api_response_sent'] = true;
+    header('Content-Type: application/json; charset=utf-8');
     http_response_code($status);
-    if ($status >= 400 && !array_key_exists('ok', $data)) {
-        $data = ['ok' => false] + $data;
-    }
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    echo $json;
     exit;
 }
 
 set_exception_handler(function (Throwable $exception): void {
-    if (db()->inTransaction()) {
-        db()->rollBack();
-    }
+    api_rollback_safely();
     $message = sprintf(
         '[API] %s: %s in %s:%d',
         get_class($exception),
@@ -41,6 +51,8 @@ set_exception_handler(function (Throwable $exception): void {
         $exception->getLine()
     );
     error_log($message);
+    // A shutdown failure must not append a second document to a completed response.
+    if ($GLOBALS['api_response_sent']) return;
 
     $logDir = __DIR__ . '/../storage/logs';
     if (!is_dir($logDir)) {
@@ -59,7 +71,9 @@ set_exception_handler(function (Throwable $exception): void {
         'error' => 'Erro interno no servidor.',
     ];
 
-    if ((bool) (config()['app']['debug'] ?? false)) {
+    $debug = false;
+    try { $debug = function_exists('config') && (bool) (config()['app']['debug'] ?? false); } catch (Throwable $ignored) {}
+    if ($debug) {
         $payload['debug'] = [
             'type' => get_class($exception),
             'message' => $exception->getMessage(),
@@ -72,8 +86,29 @@ set_exception_handler(function (Throwable $exception): void {
 });
 
 set_error_handler(function (int $severity, string $message, string $file, int $line): bool {
-    return false;
+    if (!(error_reporting() & $severity)) return false;
+    if (in_array($severity, [E_DEPRECATED, E_USER_DEPRECATED], true)) {
+        error_log('[API deprecated] '.$message.' in '.$file.':'.$line);
+        return true;
+    }
+    throw new ErrorException($message, 0, $severity, $file, $line);
 });
+
+register_shutdown_function(function (): void {
+    $error = error_get_last();
+    if (!$GLOBALS['api_response_sent'] && $error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        api_clear_output();
+        if (!headers_sent()) { http_response_code(500); header('Content-Type: application/json; charset=utf-8'); }
+        echo '{"ok":false,"error":"Erro interno no servidor."}';
+    }
+});
+
+// Install the error boundary before loading config, sessions, PDO or services.
+require_once __DIR__ . '/../includes/match_helpers.php';
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET' && basename($_SERVER['SCRIPT_NAME'] ?? '') !== 'score.php') {
+    register_shutdown_function('public_cache_forget_all');
+}
 
 function json_input(): array
 {

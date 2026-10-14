@@ -2,6 +2,8 @@
 
 ## Interface recuperada
 
+`api_json_response.php` exige uma cópia isolada `interclasse_admin_test_*` e verifica JSON íntegro diante de saída inesperada, avisos, exceções, falha simulada de banco e texto com UTF-8 inválido. Confere também a reversão da transação ao ocorrer um aviso durante uma gravação.
+
 `admin_ui_integration.php` executa os cenários de `admin_integration.php` e verifica os formulários originais, inscrição sem redistribuição dos grupos, criação de evento com regras próprias e os controles administrativos de Handebol, FIFA, Clash Royale, Vôlei, Basquete e Xadrez. O teste exige banco ou esquema isolado com prefixo `interclasse_admin_test_`.
 
 `browser_restored_ui.cjs` recebe `ADMIN_FIXTURE`, `BASE_URL`, `PLAYWRIGHT_MODULE`, `BROWSER_EXECUTABLE` e `SCREENSHOT_DIR`. Confere páginas separadas, campos preservados ao cancelar, gravação sem navegação completa, opções avançadas recolhidas, histórico contextual, placar FIFA e formulários sem JavaScript. Produz capturas em desktop e celular.
