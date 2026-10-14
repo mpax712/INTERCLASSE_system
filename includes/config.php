@@ -24,10 +24,10 @@ if ($databaseUrl !== '') {
 $config = [
     'db' => [
         'driver' => getenv('DB_DRIVER') ?: 'pgsql',
-        'host' => getenv('DB_HOST') ?: 'aws-0-us-east-2.pooler.supabase.com',
+        'host' => getenv('DB_HOST') ?: 'aws-1-sa-east-1.pooler.supabase.com',
         'port' => (int) (getenv('DB_PORT') ?: 5432),
         'database' => getenv('DB_DATABASE') ?: 'postgres',
-        'username' => getenv('DB_USERNAME') ?: 'postgres.irpaajhtekpvlpfwzxke',
+        'username' => getenv('DB_USERNAME') ?: 'postgres.qligtwmuqawnsjhjklcr',
         'password' => getenv('DB_PASSWORD') ?: '',
         'sslmode' => getenv('DB_SSLMODE') ?: 'require',
         'charset' => getenv('DB_CHARSET') ?: 'utf8mb4',
@@ -35,7 +35,7 @@ $config = [
     'app' => [
         'name' => getenv('APP_NAME') ?: 'Interclasse Escolar',
         'base_url' => getenv('APP_BASE_URL') ?: '',
-        'secure_cookies' => filter_var(getenv('APP_SECURE_COOKIES') ?: false, FILTER_VALIDATE_BOOLEAN),
+        'secure_cookies' => filter_var(getenv('APP_SECURE_COOKIES') ?: (getenv('VERCEL')==='1'), FILTER_VALIDATE_BOOLEAN),
         'debug' => filter_var(getenv('APP_DEBUG') ?: false, FILTER_VALIDATE_BOOLEAN),
         'auto_schema_updates' => filter_var(getenv('APP_AUTO_SCHEMA_UPDATES') ?: false, FILTER_VALIDATE_BOOLEAN),
         'timezone' => getenv('APP_TIMEZONE') ?: 'America/Sao_Paulo',

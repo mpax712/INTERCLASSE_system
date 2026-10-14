@@ -44,6 +44,9 @@ function game_score_battles(array $battles, int $bestOf): array
 
 function game_apply_score_action(int $matchId, array $data, array $user): array
 {
+    if (($user['role'] ?? '') === 'admin') {
+        throw new GameScoreException('Correções e cancelamentos administrativos exigem prévia de impacto.',428);
+    }
     $requestId = (string) ($data['request_id'] ?? '');
     if (!preg_match('/^[a-zA-Z0-9_-]{16,64}$/', $requestId)) throw new GameScoreException('Identificador da operação inválido.');
     $expectedVersion = filter_var($data['expected_version'] ?? null, FILTER_VALIDATE_INT);

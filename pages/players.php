@@ -1,4 +1,6 @@
 <?php
+if (has_role(['admin'])) { $adminInitialTab = 'players'; require __DIR__ . '/admin_workspace.php'; return; }
+
 require_login();
 
 $teamId = (int) ($_GET['team_id'] ?? 0);

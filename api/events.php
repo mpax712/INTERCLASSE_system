@@ -1,6 +1,8 @@
 <?php
 
 require __DIR__ . '/_bootstrap.php';
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET' && has_role(['admin'])) { require_api_roles(['admin']); json_response(['error'=>'A exclusão de eventos exige análise administrativa.', 'admin_url'=>'index.php?page=match_manager'],428); }
+
 ensure_interclasse_schema_updates();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {

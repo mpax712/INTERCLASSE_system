@@ -19,7 +19,7 @@ if ($cached !== null) {
 $params = [];
 $sql = 'SELECT m.id, m.event_id, m.modality, m.gender, m.stage, m.group_name,
             m.home_team_id, m.away_team_id, m.home_player_id, m.away_player_id,
-            m.home_score, m.away_score, m.score_data, m.winner_team_id, m.winner_player_id,
+            m.home_score, m.away_score, m.score_data, m.winner_team_id, m.winner_player_id, m.participant_snapshot,
             m.status, m.starts_at, m.place, m.sort_order, m.version,
             e.name AS event_name, COALESCE(hp.name, ht.name) AS home_name, COALESCE(ap.name, at.name) AS away_name
         FROM matches m
@@ -44,6 +44,6 @@ $sql .= ' ORDER BY m.starts_at, m.sort_order, m.id LIMIT ' . $limit;
 $stmt = db()->prepare($sql);
 $stmt->execute($params);
 
-$payload = ['data' => $stmt->fetchAll()];
+$payload = ['data' => array_map('match_historical_labels', $stmt->fetchAll())];
 public_cache_write($cacheKey, $payload, 60);
 json_response($payload);

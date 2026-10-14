@@ -1,6 +1,8 @@
 <?php
 
 require __DIR__ . '/_bootstrap.php';
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET' && has_role(['admin'])) { json_response(['error'=>'Use a prévia administrativa antes de alterar inscrições.', 'admin_url'=>'index.php?page=match_manager'],428); }
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $user = current_user();

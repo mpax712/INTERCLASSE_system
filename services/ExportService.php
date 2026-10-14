@@ -68,7 +68,7 @@ class ExportService
     {
         $sql = 'SELECT m.id, m.event_id, m.modality, m.gender, m.stage, m.group_name,
                     m.home_team_id, m.away_team_id, m.home_score, m.away_score,
-                    m.score_data, m.status, m.starts_at, m.place, m.winner_team_id, m.home_player_id, m.away_player_id, m.winner_player_id, m.sort_order,
+                    m.score_data, m.status, m.starts_at, m.place, m.winner_team_id, m.home_player_id, m.away_player_id, m.winner_player_id, m.sort_order, m.participant_snapshot,
                     ht.name AS home_team_name, ht.class_name AS home_class_name,
                     at.name AS away_team_name, at.class_name AS away_class_name,
                     ht.name AS home_name, at.name AS away_name,
@@ -97,7 +97,7 @@ class ExportService
 
         $stmt = db()->prepare($sql);
         $stmt->execute($params);
-        $matches = $stmt->fetchAll();
+        $matches = array_map('match_historical_labels', $stmt->fetchAll());
 
         $teamIds = [];
         foreach ($matches as $match) {

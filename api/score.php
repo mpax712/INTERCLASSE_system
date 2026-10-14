@@ -9,6 +9,7 @@ function score_cache_file(int $matchId): string
 
 function score_cache_read(int $matchId): ?array
 {
+    if(getenv('VERCEL')==='1')return null;
     $file = score_cache_file($matchId);
     if (!is_file($file)) {
         return null;
@@ -24,6 +25,7 @@ function score_cache_read(int $matchId): ?array
 
 function score_cache_write(int $matchId, array $payload): void
 {
+    if(getenv('VERCEL')==='1')return;
     $dir = dirname(score_cache_file($matchId));
     if (!is_dir($dir)) {
         @mkdir($dir, 0755, true);
@@ -81,6 +83,10 @@ $match = $stmt->fetch();
 
 if (!$match) {
     json_response(['error' => 'Partida não encontrada.'], 404);
+}
+
+if ($user['role']==='admin') {
+    json_response(['error'=>'Use a análise de impacto administrativa para corrigir, reiniciar ou cancelar esta partida.', 'admin_url'=>'index.php?page=match_manager&event_id=' . $match['event_id'] . '&modality=' . $match['modality']],428);
 }
 
 if (game_is_new_modality((string) $match['modality'])) {

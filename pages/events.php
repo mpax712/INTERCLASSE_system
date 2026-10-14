@@ -7,6 +7,11 @@ $allowedModalities = allowed_modalities();
 ensure_interclasse_schema_updates();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($canCreateEvents) {
+        http_response_code(428);
+        echo '<div class="alert alert-warning">Use o gerenciamento administrativo para analisar e confirmar esta alteração.</div>';
+        return;
+    }
     verify_csrf();
     $action = $_POST['action'] ?? 'create';
 
@@ -381,7 +386,7 @@ $totals = db()->query(
                 <div class="event-card-footer">
                     <span class="small text-muted">Elencos até <?= e(format_datetime($event['roster_edit_until'])) ?></span>
                     <div class="event-admin-actions">
-                        <?php if ($manager && $event['status'] !== 'encerrado'): ?>
+                        <?php if ($manager && !$canCreateEvents && $event['status'] !== 'encerrado'): ?>
                             <form method="post" class="d-flex flex-wrap gap-2 align-items-center">
                                 <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                                 <input type="hidden" name="action" value="status">
@@ -395,11 +400,11 @@ $totals = db()->query(
                             </form>
                         <?php endif; ?>
                         <div class="event-danger-actions">
-                            <?php if ($manager && $event['status'] === 'encerrado' && !$event['archived']): ?>
+                            <?php if ($manager && !$canCreateEvents && $event['status'] === 'encerrado' && !$event['archived']): ?>
                                 <button class="btn btn-sm btn-outline-warning archive-btn" data-event-id="<?= (int) $event['id'] ?>">Arquivar</button>
                             <?php endif; ?>
                             <?php if ($user && $user['role'] === 'admin'): ?>
-                                <button class="btn btn-sm btn-outline-danger delete-event-btn" data-event-id="<?= (int) $event['id'] ?>">Excluir</button>
+                                <a class="btn btn-sm btn-outline-primary" href="index.php?page=match_manager&amp;event_id=<?= (int) $event['id'] ?>&amp;tab=events">Gerenciar / arquivar</a>
                             <?php endif; ?>
                         </div>
                     </div>

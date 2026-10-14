@@ -248,6 +248,7 @@ function public_cache_file(string $key): string
 
 function public_cache_read(string $key): ?array
 {
+    if(getenv('VERCEL')==='1')return null;
     $file = public_cache_file($key);
     if (!is_file($file)) {
         return null;
@@ -263,6 +264,7 @@ function public_cache_read(string $key): ?array
 
 function public_cache_write(string $key, array $data, int $ttl): void
 {
+    if(getenv('VERCEL')==='1')return;
     $dir = public_cache_dir();
     if (!is_dir($dir)) {
         @mkdir($dir, 0755, true);
@@ -433,6 +435,7 @@ function player_limit_for_team(array $team): int
 
 function over_limit_teams(int $eventId, string $modality, ?string $gender = 'masculino'): array
 {
+    if (class_exists('AdminCompetitionService', false) && AdminCompetitionService::$planning) return [];
     $limit = player_limit_for_event_modality($eventId, $modality);
 
     if ($limit <= 0 || $limit >= 999) {

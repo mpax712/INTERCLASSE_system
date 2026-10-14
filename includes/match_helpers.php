@@ -2,6 +2,16 @@
 
 require_once __DIR__ . '/helpers.php';
 
+function match_historical_labels(array $match): array
+{
+    $snapshot=json_decode($match['participant_snapshot']??'{}',true)??[];
+    foreach(['home','away'] as $side){
+        foreach([$side.'_name',$side.'_team_name',$side.'_bracket_player_name'] as $key)if(empty($match[$key])&&!empty($snapshot[$side]['name']))$match[$key]=$snapshot[$side]['name'];
+        foreach([$side.'_class',$side.'_class_name',$side.'_bracket_player_class_name'] as $key)if((empty($match[$key])||in_array($match['status']??'', ['encerrada','wo'],true))&&!empty($snapshot[$side]['class_name']))$match[$key]=$snapshot[$side]['class_name'];
+    }
+    return $match;
+}
+
 function default_score_data(string $modality): array
 {
     if ($modality === 'volei') {
@@ -545,6 +555,15 @@ function assign_team_groups(int $eventId, string $modality, ?string $gender = 'm
     $update = db()->prepare('UPDATE teams SET group_name = ? WHERE id = ?');
 
     foreach ($teams as $team) {
+        if (($team['group_name'] ?? '') !== '') {
+            $name = $team['group_name'];
+            if (!isset($groupCounts[$name])) { $groups[] = $name; $groupCounts[$name] = 0; }
+            $groupCounts[$name]++;
+        }
+    }
+
+    foreach ($teams as $team) {
+        if (($team['group_name'] ?? '') !== '') continue;
         $selectedGroup = $groups[0];
         foreach ($groups as $group) {
             if ($groupCounts[$group] < $groupCounts[$selectedGroup]) {
@@ -603,7 +622,7 @@ function generate_group_matches(int $eventId, string $modality, ?string $baseDat
     }
     $ungroupedStmt = db()->prepare($ungroupedSql);
     $ungroupedStmt->execute($ungroupedParams);
-    if ((int) $ungroupedStmt->fetchColumn() === 0) {
+    if ((int) $ungroupedStmt->fetchColumn() > 0) {
         assign_team_groups($eventId, $modality, $gender);
     }
 
@@ -614,6 +633,7 @@ function generate_group_matches(int $eventId, string $modality, ?string $baseDat
     ];
 
     $minPlayers = $minPlayersByModality[$modality] ?? 0;
+    if (class_exists('AdminCompetitionService', false) && AdminCompetitionService::$planning) $minPlayers = 0;
 
     // Check player counts and mark insufficient teams as W.O.
     if ($minPlayers > 0) {

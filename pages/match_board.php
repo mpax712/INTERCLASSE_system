@@ -35,7 +35,7 @@ $boardPage = min($boardPage, $boardPages);
 $boardSql = 'SELECT m.*, COALESCE(hp.name, ht.name) AS home_name, COALESCE(ap.name, at.name) AS away_name, ht.class_name AS home_class, at.class_name AS away_class ' . $from . ' ORDER BY CASE m.stage WHEN \'grupo\' THEN 0 WHEN \'repescagem\' THEN 1 WHEN \'preliminar\' THEN 2 WHEN \'dezesseis_avos\' THEN 3 WHEN \'oitavas\' THEN 4 WHEN \'quartas\' THEN 5 WHEN \'semifinal\' THEN 6 WHEN \'final\' THEN 7 ELSE 8 END, m.group_name, m.sort_order, m.id LIMIT ' . $boardPerPage . ' OFFSET ' . (($boardPage - 1) * $boardPerPage);
 $boardStmt = db()->prepare($boardSql);
 $boardStmt->execute($params);
-$boardMatches = $boardStmt->fetchAll();
+$boardMatches = array_map('match_historical_labels', $boardStmt->fetchAll());
 $boardRounds = [];
 foreach ($boardMatches as $item) {
     $key = $item['stage'] === 'grupo' && $item['group_name'] ? 'Grupo ' . $item['group_name'] : stage_label($item['stage']);

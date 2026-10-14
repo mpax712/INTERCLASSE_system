@@ -11,6 +11,10 @@ function start_app_session(): void
     }
 
     $secure = (bool) config()['app']['secure_cookies'];
+    if(getenv('VERCEL')==='1'||getenv('APP_SESSION_DRIVER')==='database'){
+        require_once __DIR__.'/DatabaseSessionHandler.php';
+        session_set_save_handler(new DatabaseSessionHandler(db()),true);
+    }
     $sessionPath = session_save_path();
     if ($sessionPath && !is_writable($sessionPath) && is_writable(sys_get_temp_dir())) {
         session_save_path(sys_get_temp_dir());

@@ -1,6 +1,11 @@
 <?php
 
 require __DIR__ . '/_bootstrap.php';
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    require_api_roles(['admin']);
+    verify_api_csrf(json_input());
+    json_response(['error'=>'Use a prévia administrativa para criar, corrigir ou remover turmas globais.'],428);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (!empty($_GET['id'])) {

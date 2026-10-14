@@ -41,16 +41,17 @@ function game_generate_groups(int $eventId, string $modality): int
     if ($modality !== 'fifa' || bracket_type_for_event_modality($eventId, $modality) !== 'groups') {
         throw new RuntimeException('Esta modalidade não usa fase de grupos.');
     }
-    db()->beginTransaction();
+    $ownsTransaction = !db()->inTransaction();
+    if ($ownsTransaction) db()->beginTransaction();
     try {
         $lock = db()->prepare('SELECT id FROM event_modalities WHERE event_id = ? AND modality = ? FOR UPDATE');
         $lock->execute([$eventId, $modality]);
         if (!$lock->fetch()) {
             throw new RuntimeException('Modalidade não pertence ao evento.');
         }
-        $existing = db()->prepare('SELECT COUNT(*) FROM matches WHERE event_id = ? AND modality = ?');
+        $existing = db()->prepare("SELECT COUNT(*) FROM matches WHERE event_id = ? AND modality = ? AND stage='grupo'");
         $existing->execute([$eventId, $modality]);
-        if ((int) $existing->fetchColumn() > 0) {
+        if ((int) $existing->fetchColumn() > 0 && !(class_exists('AdminCompetitionService',false) && AdminCompetitionService::$planning)) {
             throw new RuntimeException('Esta modalidade já possui partidas.');
         }
         $players = game_players($eventId, $modality);
@@ -61,25 +62,31 @@ function game_generate_groups(int $eventId, string $modality): int
         if ($groupCount > 26) {
             throw new RuntimeException('O limite é 26 grupos.');
         }
-        $groups = array_fill(0, $groupCount, []);
-        foreach ($players as $index => $player) {
-            $groupIndex = $index % $groupCount;
-            $groups[$groupIndex][] = $player;
+        $groups = [];
+        foreach ($players as $player) if (!empty($player['group_name'])) $groups[$player['group_name']][] = $player;
+        for ($i=0;$i<$groupCount;$i++) $groups[chr(65+$i)] ??= [];
+        foreach ($players as $player) {
+            if (!empty($player['group_name'])) continue;
+            $counts=array_map('count',$groups);asort($counts);$groupName=array_key_first($counts);
+            $groups[$groupName][] = $player;
             $update = db()->prepare('UPDATE players SET group_name = ? WHERE id = ?');
-            $update->execute([chr(65 + $groupIndex), $player['id']]);
+            $update->execute([$groupName, $player['id']]);
         }
         $created = 0;
         foreach ($groups as $index => $groupPlayers) {
             for ($i = 0; $i < count($groupPlayers); $i++) {
                 for ($j = $i + 1; $j < count($groupPlayers); $j++) {
-                    game_create_match($eventId, $modality, 'grupo', chr(65 + $index), game_node_for_player($groupPlayers[$i]), game_node_for_player($groupPlayers[$j]), ++$created);
+                    $exists=db()->prepare("SELECT id FROM matches WHERE event_id=? AND modality=? AND stage='grupo' AND group_name=? AND ((home_player_id=? AND away_player_id=?) OR (home_player_id=? AND away_player_id=?))");
+                    $exists->execute([$eventId,$modality,$index,$groupPlayers[$i]['id'],$groupPlayers[$j]['id'],$groupPlayers[$j]['id'],$groupPlayers[$i]['id']]);
+                    if($exists->fetchColumn())continue;
+                    game_create_match($eventId, $modality, 'grupo', $index, game_node_for_player($groupPlayers[$i]), game_node_for_player($groupPlayers[$j]), ++$created);
                 }
             }
         }
-        db()->commit();
+        if ($ownsTransaction) db()->commit();
         return $created;
     } catch (Throwable $error) {
-        if (db()->inTransaction()) db()->rollBack();
+        if ($ownsTransaction && db()->inTransaction()) db()->rollBack();
         throw $error;
     }
 }
@@ -89,7 +96,8 @@ function game_generate_bracket(int $eventId, string $modality, ?array $qualified
     if (!game_is_new_modality($modality)) {
         throw new RuntimeException('Modalidade não suportada.');
     }
-    db()->beginTransaction();
+    $ownsTransaction = !db()->inTransaction();
+    if ($ownsTransaction) db()->beginTransaction();
     try {
         $lock = db()->prepare('SELECT id, bracket_type FROM event_modalities WHERE event_id = ? AND modality = ? FOR UPDATE');
         $lock->execute([$eventId, $modality]);
@@ -151,10 +159,10 @@ function game_generate_bracket(int $eventId, string $modality, ?array $qualified
             $nodes = $next;
             $roundSize /= 2;
         }
-        db()->commit();
+        if ($ownsTransaction) db()->commit();
         return $created;
     } catch (Throwable $error) {
-        if (db()->inTransaction()) db()->rollBack();
+        if ($ownsTransaction && db()->inTransaction()) db()->rollBack();
         throw $error;
     }
 }

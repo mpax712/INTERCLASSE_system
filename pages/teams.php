@@ -1,4 +1,6 @@
 <?php
+if (has_role(['admin'])) { $adminInitialTab = 'teams'; require __DIR__ . '/admin_workspace.php'; return; }
+
 require_roles(['admin', 'professor']);
 ensure_interclasse_schema_updates();
 
@@ -146,12 +148,10 @@ if ($isMixedModality) {
 $representatives = $representativesStmt->fetchAll();
 $playerLimit = player_limit_for_event_modality($eventId, $modality);
 $teamsStmt = db()->prepare(
-    'SELECT t.*, t.representative_name AS manual_representative_name, u.name AS representative_user_name, COUNT(p.id) AS player_count
+    'SELECT t.*, t.representative_name AS manual_representative_name, u.name AS representative_user_name, (SELECT COUNT(*) FROM players p WHERE p.team_id=t.id) AS player_count
      FROM teams t
      LEFT JOIN users u ON u.id = t.representative_id
-     LEFT JOIN players p ON p.team_id = t.id
      WHERE t.event_id = ? AND t.modality = ?
-     GROUP BY t.id, u.name
      ORDER BY t.group_name, t.name'
 );
 $teamsStmt->execute([$eventId, $modality]);

@@ -9,6 +9,28 @@
 
 O sistema também oferece suporte a PostgreSQL/Supabase. A seção de instalação abaixo descreve essa alternativa. Configurações privadas, dumps com dados, logs, caches e sessões ficam fora do Git.
 
+## Gerenciamento administrativo
+
+Após fazer backup, execute `php scripts/migrate_admin_management.php`. A migração funciona em MySQL/MariaDB e PostgreSQL, é aditiva e idempotente e preserva resultados e inscrições existentes. Bancos novos também precisam dessa migração após importar o esquema base.
+
+O painel de montagem reúne partidas, jogadores, inscrições, turmas globais, eventos, regras e histórico. Administradores podem corrigir campeonatos encerrados. Cada alteração apresenta uma prévia, exige justificativa e confirma exatamente a proposta analisada. Escolha atualizar com segurança, reiniciar resultados dependentes ou pausar os confrontos inconsistentes para reorganizar manualmente. Cancelar a prévia não modifica registros.
+
+Arquivamento preserva identidades e permite restauração. Exclusão definitiva exige digitar EXCLUIR; uma cópia dos registros removidos permanece no histórico administrativo. As APIs antigas recusam gravações administrativas de inscrições, turmas, eventos e placares: use `api/admin_operations.php`. Os demais perfis mantêm suas permissões de operação.
+
+Os geradores suportam até 32 participantes nos mata-matas automáticos. Inscrições excedentes podem permanecer cadastradas; selecione os elegíveis ou organize as fases manualmente. Gerar faltantes preserva caminhos existentes e informa quando uma vaga não pode ser reconstruída com segurança. Regenerar arquiva estruturas substituídas e conserva confrontos compatíveis.
+
+Os testes `tests/admin_integration.php` aceitam exclusivamente uma cópia com banco/esquema `interclasse_admin_test_*`. `tests/browser_admin.cjs` valida a interface nessa cópia; `tests/admin_pg_confirmation.php` verifica proposta congelada, exclusão, restauração e sessões PostgreSQL. Não execute operações de teste no banco real.
+
+## Hospedagem no Vercel
+
+O arquivo `vercel.json` usa `vercel-php@0.9.0`, encaminha `/` e `/index.php` para `api/index.php`, inclui os arquivos PHP necessários e mantém assets e APIs nas URLs atuais. Diretórios internos e arquivos privados não são publicados como páginas. Selecione a raiz deste repositório como Root Directory e o preset Other, sem comando de build personalizado.
+
+Configure `DATABASE_URL` no painel Environment Variables do Vercel, com a senha real codificada na URL e `sslmode=require`. O `.env.example` aponta para o novo pooler de São Paulo na porta 5432 (modo sessão). Configure Production e Preview conforme os bancos correspondentes; não envie senhas ao Git. Use `APP_DEBUG=false` e `APP_SECURE_COOKIES=true`.
+
+No Vercel, sessões de login/CSRF são compartilhadas no banco (`app_sessions`), e caches locais são desativados. Isso evita depender dos arquivos temporários de uma única instância. O esquema deve estar migrado antes do deploy. A configuração local privada permite continuar usando PHP/XAMPP; ela não é incluída no deploy. O runtime e a hospedagem devem ser verificados com um deploy de Preview antes de promover alterações em produção.
+
+Para migrar MySQL a um Supabase vazio, use `php scripts/migrate_mysql_to_supabase.php CAMINHO_CONFIG_PRIVADA public`. O script se recusa a sobrescrever um destino com registros, mantém IDs e vínculos, compara todos os valores dentro da transação e bloqueia acesso direto às tabelas pela API pública do Supabase. Faça backup da origem antes de executá-lo.
+
 Sistema simples em PHP puro, PostgreSQL (Supabase), HTML, CSS e JavaScript para organizar interclasses escolares com eventos, modalidades, times, jogadores, tabela pública, classificação, repescagem, W.O. e placar controlado durante o jogo.
 
 ## Modalidades FIFA e Clash Royale
@@ -23,7 +45,7 @@ php scripts/migrate_game_features.php
 
 A migração é idempotente, adiciona campos e índices e não reimporta o arquivo de 2026. Para um banco novo, use o esquema em `database/supabase_schema.sql`. O evento de 2026 mantém apenas suas modalidades originais.
 
-As alterações de placar usam versão da partida e identificador único da requisição. Se duas pessoas tentarem alterar a mesma versão, a segunda recebe conflito e deve recarregar o estado atual. Repetir a mesma requisição não aplica o resultado novamente. Correções e cancelamentos exigem administrador e motivo; a correção é bloqueada quando um confronto dependente já começou ou quando a fase eliminatória de um grupo já foi criada.
+As alterações de placar usam versão da partida e identificador único da requisição. Se duas pessoas tentarem alterar a mesma versão, a segunda recebe conflito e deve atualizar o estado atual. Repetir a mesma requisição não aplica o resultado novamente. Correções administrativas passam pela prévia de impacto e permitem resolver dependências já iniciadas pelas estratégias do painel.
 
 Para executar os testes de integração, configure `TEST_SCHEMA` com um esquema isolado cujo nome comece com `interclasse_game_stage_`. O primeiro comando abaixo copia as tabelas atuais do esquema público; ele se recusa a sobrescrever um esquema de teste existente. Execute-o apenas em um banco de desenvolvimento ou de homologação. Os testes criam e removem dados nesse esquema, portanto nunca os aponte para o esquema público.
 

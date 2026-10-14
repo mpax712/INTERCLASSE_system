@@ -33,6 +33,9 @@
         </footer>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
         <script src="assets/js/app.js"></script>
+        <?php if (!empty($adminWorkspaceLoaded) || in_array($page ?? '', ['event','match_manager'],true)): ?>
+        <script src="assets/js/admin-competition.js?v=<?= filemtime(__DIR__ . '/../assets/js/admin-competition.js') ?>"></script>
+        <?php endif; ?>
         <?php if (in_array($page ?? '', ['event', 'match_manager'], true)): ?>
         <?php foreach (['event-workspace', 'manager-workspace', 'workspace-navigation'] as $script): ?>
         <script src="assets/js/<?= $script ?>.js?v=<?= filemtime(__DIR__ . '/../assets/js/' . $script . '.js') ?>"></script>

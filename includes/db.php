@@ -50,6 +50,8 @@ function db(): PDO
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
         ]);
+        $schema = $driver === 'pgsql' ? 'current_schema()' : 'DATABASE()';
+        $pdo->activeViewsEnabled = (int) $pdo->query("SELECT COUNT(*) FROM information_schema.views WHERE table_schema=$schema AND table_name IN ('active_matches','active_players','active_teams','active_classes')")->fetchColumn() === 4;
     }
 
     return $pdo;

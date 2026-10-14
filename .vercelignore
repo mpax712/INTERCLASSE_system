@@ -1,0 +1,15 @@
+.git
+.env*
+includes/config.local.php
+storage
+database
+tests
+scripts
+*.sql
+*.bak
+*.backup
+*.zip
+anota*.txt
+node_modules
+README.md
+api/README.md

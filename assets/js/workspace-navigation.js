@@ -182,6 +182,7 @@
 
     root.addEventListener('submit', async event => {
         const form = event.target;
+        if (form.hasAttribute('data-admin-form')) return;
         const url = new URL(form.getAttribute('action') || location.href, location.href);
         if (!isWorkspaceUrl(url)) return;
         event.preventDefault();

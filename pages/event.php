@@ -327,6 +327,12 @@ function generate_bracket_matches(int $eventId, string $modality, ?string $place
 $canManage = can_manage_event_structure($eventId);
 $canModifyTables = $canManage;
 
+if ($_SERVER['REQUEST_METHOD']==='POST' && has_role(['admin'])) {
+    http_response_code(428);
+    echo '<div class="alert alert-warning">Use a montagem administrativa para analisar e confirmar a geração ou alteração de partidas.</div>';
+    return;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$canModifyTables) {
     require_login();
     http_response_code(403);
@@ -474,12 +480,10 @@ if (!$isMixedModality && !in_array($gender, ['masculino', 'feminino'], true)) {
 }
 
 $selectedPlayerLimit = player_limit_for_event_modality($eventId, $selectedModality);
-$teamSql = 'SELECT t.*, t.representative_name AS manual_representative_name, u.name AS representative_user_name, COUNT(p.id) AS player_count
+$teamSql = 'SELECT t.*, t.representative_name AS manual_representative_name, u.name AS representative_user_name, (SELECT COUNT(*) FROM players p WHERE p.team_id=t.id) AS player_count
     FROM teams t
     LEFT JOIN users u ON u.id = t.representative_id
-    LEFT JOIN players p ON p.team_id = t.id
     WHERE t.event_id = ? AND t.modality = ?' . gender_filter_sql($selectedModality) . '
-    GROUP BY t.id, u.name
     ORDER BY t.group_name, t.name';
 $teamParams = array_merge([$eventId, $selectedModality], gender_filter_params($selectedModality, $gender));
 $teamsStmt = db()->prepare($teamSql);
@@ -673,7 +677,10 @@ if ($isBracketModality || game_is_new_modality($selectedModality)) {
             <span class="small text-muted">Use quando as inscrições ou fases anteriores estiverem prontas.</span>
         </div>
         <div class="card-body">
-            <?php if ($event['status'] === 'encerrado'): ?>
+            <?php if (has_role(['admin'])): ?>
+                <a class="btn btn-primary" href="index.php?page=match_manager&event_id=<?= $eventId ?>&modality=<?= e($selectedModality) ?>&gender=<?= e($gender) ?>">Gerar, reorganizar ou corrigir confrontos</a>
+                <p class="text-muted mt-2 mb-0">A prévia informa quais partidas e resultados serão mantidos, atualizados ou arquivados.</p>
+            <?php elseif ($event['status'] === 'encerrado'): ?>
                 <div class="alert alert-warning mb-0">Evento encerrado. Não é possível gerar novas partidas ou fases.</div>
             <?php else: ?>
                 <div class="row g-2 align-items-end event-actions-grid">

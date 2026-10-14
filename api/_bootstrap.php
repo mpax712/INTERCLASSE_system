@@ -147,6 +147,7 @@ function fetch_match_payload(int $matchId): array
         json_response(['error' => 'Partida não encontrada.'], 404);
     }
 
+    $match = match_historical_labels($match);
     $status = (string) $match['status'];
     $lastScoreLog = null;
     try {

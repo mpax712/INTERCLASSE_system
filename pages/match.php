@@ -19,6 +19,7 @@ if (!$match) {
     return;
 }
 
+$match=match_historical_labels($match);
 $scoreData = decode_score_data($match['score_data'] ?? null, $match['modality']);
 $homeName = $match['home_name'] ?? 'A definir';
 $awayName = $match['away_name'] ?? 'A definir';

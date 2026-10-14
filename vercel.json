@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/*.php": {
+      "runtime": "vercel-php@0.9.0",
+      "maxDuration": 60,
+      "includeFiles": "{index.php,includes/**,pages/**,services/**,assets/**}"
+    }
+  },
+  "routes": [
+    { "src": "/(?:includes|pages|services|scripts|tests|database|storage)(?:/.*)?", "status": 404 },
+    { "src": "/api/_bootstrap.php", "status": 404 },
+    { "src": "/(?:index.php)?", "dest": "/api/index.php" },
+    { "src": "/(?!api/).*\\.php", "status": 404 },
+    { "handle": "filesystem" },
+    { "src": "/.*", "status": 404 }
+  ]
+}

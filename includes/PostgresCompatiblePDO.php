@@ -10,6 +10,8 @@
 final class PostgresCompatiblePDO extends PDO
 {
     private bool $isPostgres;
+    public bool $activeViewsEnabled = false;
+    public bool $includeArchived = false;
 
     public function __construct(string $dsn, ?string $username = null, ?string $password = null, ?array $options = null)
     {
@@ -49,6 +51,16 @@ final class PostgresCompatiblePDO extends PDO
 
     private function normalizeSql(string $sql): string
     {
+        if ($this->activeViewsEnabled && !$this->includeArchived) {
+            // Rewrite read references only; DML targets and quoted strings remain untouched.
+            $segments = preg_split('/(\'(?:\'\'|[^\'])*\'|"(?:[^"\\\\]|\\\\.)*"|--[^\n]*|\/\*.*?\*\/)/s', $sql, -1, PREG_SPLIT_DELIM_CAPTURE);
+            foreach ($segments as $index => $segment) {
+                if ($index % 2 === 0) {
+                    $segments[$index] = preg_replace('/\b(FROM|JOIN)\s+(matches|players|teams|classes)\b/i', '$1 active_$2', $segment);
+                }
+            }
+            $sql = implode('', $segments);
+        }
         if (!$this->isPostgres) {
             return $this->normalizeMysqlSql($sql);
         }
@@ -103,6 +115,7 @@ final class PostgresCompatiblePDO extends PDO
     /** Translate the PostgreSQL expressions used by the application for MariaDB. */
     private function normalizeMysqlSql(string $sql): string
     {
+        $sql = preg_replace('/FOR UPDATE OF \w+/i', 'FOR UPDATE', $sql);
         $sql = preg_replace('/INTERVAL "(\d+) day"/i', 'INTERVAL $1 DAY', $sql);
         $sql = preg_replace_callback(
             '/array_position\(ARRAY\[([^\]]+)\],\s*([\w.]+)::text\)/i',
